@@ -401,6 +401,48 @@
   ::-webkit-scrollbar-thumb:hover{background:#9fb0c4;}
 
   @media print{nav,header,.no-print{display:none!important;}body{background:#fff;}main{padding:0;}}
+
+  /* ── Mobile ≤600px ── */
+  @media(max-width:600px){
+    /* Login: franja compacta, ocultar diagrama */
+    .login-left{ padding:20px 18px; }
+    .login-left-content{ flex-direction:row; align-items:center; gap:14px; flex-wrap:nowrap; justify-content:flex-start; }
+    .login-logo-wrap{ width:58px; height:58px; border-radius:14px; margin-bottom:0; flex-shrink:0; }
+    .login-brand{ font-size:1.4rem; margin:0; text-align:left; }
+    .login-brand-sub{ font-size:.85rem; }
+    .login-tagline,.login-left-hero,.login-features,.login-left-footer{ display:none!important; }
+    .login-right{ padding:22px 18px 30px; }
+    .login-right-inner{ max-width:100%; }
+    /* Header compacto */
+    header{ padding:10px 14px; gap:8px; flex-wrap:nowrap; align-items:center; }
+    header .brand{ gap:10px; min-width:0; }
+    header .logo{ width:36px; height:36px; border-radius:9px; flex-shrink:0; }
+    header h1{ font-size:.97rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    header .sub{ display:none!important; }
+    header .today{ display:none!important; }
+    header #userInfo{ display:none!important; }
+    header .btn{ font-size:.72rem!important; padding:6px 10px!important; white-space:nowrap; }
+    /* Nav: fila horizontal scrollable */
+    nav{
+      padding:6px 10px; gap:4px;
+      overflow-x:auto; flex-wrap:nowrap!important;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+    }
+    nav::-webkit-scrollbar{ display:none; }
+    nav button{ padding:7px 10px; font-size:.74rem; white-space:nowrap; flex-shrink:0; }
+    /* Contenido principal */
+    main{ padding:12px; }
+    /* Modales */
+    .modal{ padding:16px 14px; border-radius:14px; }
+    /* Stats */
+    .stat .num{ font-size:1.4rem; }
+    /* Formularios */
+    .form-actions{ flex-direction:column; }
+    .form-actions .btn{ width:100%; justify-content:center; }
+    /* Toast */
+    .toast{ bottom:14px; right:14px; left:14px; right:14px; font-size:.8rem; padding:12px 14px; }
+  }
 </style>
 </head>
 <body>

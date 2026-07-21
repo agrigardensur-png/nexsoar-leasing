@@ -452,6 +452,10 @@ a.link:hover { color: var(--accent-deep); }
 
 /* ── REGLAS DE IMPRESIÓN CORREGIDAS PARA PAGARÉ Y RECIBOS EN PDF ── */
 @media print {
+  @page {
+    size: portrait;
+    margin: 8mm 12mm !important;
+  }
   /* Ocultar todo el sistema de fondo */
   #appRoot, nav, header, .no-print, #loginScreen, #loadingOverlay, .toast, .dropdown-menu {
     display: none !important;
@@ -505,31 +509,37 @@ a.link:hover { color: var(--accent-deep); }
     overflow: visible !important;
     width: 100% !important;
     box-sizing: border-box !important;
-    font-size: .83rem !important; /* Letra compacta para garantizar 1 sola hoja */
-    line-height: 1.45 !important;
+    font-size: .77rem !important; /* Letra ultra compacta para forzar 1 sola hoja */
+    line-height: 1.38 !important;
   }
   .pagare-doc h3, .recibo-doc h3 {
     margin-top: 0 !important;
-    margin-bottom: 8px !important;
-    font-size: 1.12rem !important;
+    margin-bottom: 4px !important;
+    font-size: 1.05rem !important;
   }
   .pagare-doc p, .recibo-doc p {
-    margin: 5px 0 !important;
+    margin: 4px 0 !important;
   }
   .pagare-doc table, .recibo-doc table {
-    margin: 6px 0 !important;
+    margin: 4px 0 !important;
+  }
+  .pagare-doc .letterhead, .recibo-doc .letterhead {
+    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
   }
   .sig-section {
-    margin-top: 22px !important;
+    margin-top: 14px !important;
+    page-break-inside: avoid !important;
   }
   .sig-space {
-    height: 45px !important;
+    height: 38px !important;
   }
   .sig-space img {
-    max-height: 45px !important;
+    max-height: 38px !important;
   }
   .pagare-doc::before, .recibo-doc::before { display: none !important; }
 }
+
 
 
 /* ── RESPONSIVE MOBILE & TABLET LAYOUT (max-width: 800px) ── */

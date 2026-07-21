@@ -1,0 +1,18 @@
+{
+  "name": "NexSoar System Leasing",
+  "short_name": "NexSoar",
+  "description": "Sistema de Renta e Inventario de Maquinaria - AgriGarden",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#060e1f",
+  "theme_color": "#0a1830",
+  "icons": [
+    {
+      "src": "Logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

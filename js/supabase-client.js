@@ -52,8 +52,10 @@ export const mapRental = r => ({
   id: r.id, machineId: r.machine_id, customerId: r.customer_id,
   rentalType: r.rental_type, qty: r.qty,
   unitPrice: Number(r.unit_price) || 0, totalCharged: Number(r.total_charged) || 0,
+  amountPaid: Number(r.amount_paid != null ? r.amount_paid : (r.amountPaid != null ? r.amountPaid : (r.status === 'devuelta' ? r.total_charged : 0))) || 0,
   startDate: r.start_date, expectedReturn: r.expected_return, actualReturn: r.actual_return || null,
-  status: r.status || 'activa', deposit: Number(r.deposit) || 0, pagareId: r.pagare_id || null
+  status: r.status || 'activa', deposit: Number(r.deposit) || 0, pagareId: r.pagare_id || null,
+  signatureData: r.signature_data || r.signatureData || null
 })
 export const mapPagare = r => ({
   id: r.id, folio: r.folio, rentalId: r.rental_id,
@@ -61,5 +63,6 @@ export const mapPagare = r => ({
   machineValue: Number(r.machine_value) || 0, rentalType: r.rental_type,
   unitPrice: Number(r.unit_price) || 0, qty: r.qty,
   totalCharged: Number(r.total_charged) || 0,
-  issueDate: r.issue_date, expectedReturn: r.expected_return, deposit: Number(r.deposit) || 0
+  issueDate: r.issue_date, expectedReturn: r.expected_return, deposit: Number(r.deposit) || 0,
+  signatureData: r.signature_data || r.signatureData || null
 })

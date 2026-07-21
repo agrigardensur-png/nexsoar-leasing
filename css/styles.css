@@ -279,6 +279,7 @@ button.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 button.btn.secondary { background: #fff; color: var(--navy-800); border: 1.5px solid var(--navy-700); box-shadow: none; }
 button.btn.secondary:hover { background: var(--gray-soft); transform: translateY(-1px); }
 button.btn.gold { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: var(--navy-950); box-shadow: 0 6px 16px -4px rgba(212,175,55,.55); }
+button.btn.green { background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; box-shadow: 0 6px 16px -4px rgba(22,163,74,.4); }
 button.btn.danger { background: linear-gradient(135deg, var(--red), var(--red-deep)); box-shadow: 0 6px 16px -4px rgba(225,29,72,.4); }
 button.btn.small { padding: 6px 12px; font-size: .76rem; border-radius: 8px; }
 
@@ -320,31 +321,67 @@ textarea { resize: vertical; min-height: 64px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
 .empty { color: var(--muted); font-size: .85rem; text-align: center; padding: 36px 20px; }
-.pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .muted { color: var(--muted); }
 .small { font-size: .78rem; }
 a.link { color: var(--navy-700); cursor: pointer; text-decoration: none; font-size: .82rem; font-weight: 700; border-bottom: 1.5px solid var(--accent); padding-bottom: 1px; transition: color .15s; }
 a.link:hover { color: var(--accent-deep); }
 
-.pagare-doc {
+.pagare-doc, .recibo-doc {
   font-family: 'Sora', Georgia, serif; line-height: 1.7; font-size: .92rem;
   border: 1px solid var(--border); padding: 30px; border-radius: 14px;
   background: linear-gradient(180deg, #fffdf6, #fffefb);
   box-shadow: inset 0 0 0 1px rgba(212,175,55,.15), var(--shadow-sm); position: relative;
 }
-.pagare-doc::before {
+.pagare-doc::before, .recibo-doc::before {
   content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
   width: 300px; height: 300px; pointer-events: none;
   background: url('../Logo.jpg') center/cover no-repeat; border-radius: 50%; opacity: .05; filter: grayscale(1);
 }
-.pagare-doc .letterhead { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 2px solid var(--accent); }
-.pagare-doc .letterhead img { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 12px -3px rgba(16,42,76,.4); }
-.pagare-doc .letterhead .lh-name { font-family: 'Sora', sans-serif; font-weight: 800; color: var(--navy-800); font-size: 1.05rem; letter-spacing: .04em; }
-.pagare-doc .letterhead .lh-tag { font-size: .74rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
-.pagare-doc * { position: relative; z-index: 1; }
-.pagare-doc h3 { text-align: center; text-transform: uppercase; letter-spacing: .16em; font-family: 'Sora', sans-serif; margin-bottom: 20px; color: var(--navy-800); font-weight: 800; }
-.pagare-doc .sig { margin-top: 54px; display: flex; justify-content: space-between; gap: 20px; }
-.pagare-doc .sig div { border-top: 1.5px solid var(--navy-800); width: 45%; text-align: center; padding-top: 8px; font-size: .82rem; }
+.pagare-doc .letterhead, .recibo-doc .letterhead { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 2px solid var(--accent); }
+.pagare-doc .letterhead img, .recibo-doc .letterhead img { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 12px -3px rgba(16,42,76,.4); }
+.pagare-doc .letterhead .lh-name, .recibo-doc .letterhead .lh-name { font-family: 'Sora', sans-serif; font-weight: 800; color: var(--navy-800); font-size: 1.05rem; letter-spacing: .04em; }
+.pagare-doc .letterhead .lh-tag, .recibo-doc .letterhead .lh-tag { font-size: .74rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.pagare-doc *, .recibo-doc * { position: relative; z-index: 1; }
+.pagare-doc h3, .recibo-doc h3 { text-align: center; text-transform: uppercase; letter-spacing: .16em; font-family: 'Sora', sans-serif; margin-bottom: 20px; color: var(--navy-800); font-weight: 800; }
+.pagare-doc .sig, .recibo-doc .sig { margin-top: 54px; display: flex; justify-content: space-between; gap: 20px; }
+.pagare-doc .sig div, .recibo-doc .sig div { border-top: 1.5px solid var(--navy-800); width: 45%; text-align: center; padding-top: 8px; font-size: .82rem; }
+
+/* ── MENÚ DE ACCIONES RÁPIDAS (DESPLEGABLE) ── */
+.dropdown-actions { position: relative; display: inline-block; }
+.btn-dots {
+  background: var(--gray-soft); border: 1.5px solid var(--border); color: var(--navy-800);
+  width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.1rem; cursor: pointer; transition: background .15s; line-height: 0;
+}
+.btn-dots:hover { background: #e2e8f0; color: var(--navy-900); }
+.dropdown-menu {
+  display: none; position: absolute; right: 0; top: 100%; margin-top: 4px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 10px 30px -5px rgba(15,30,60,.2); z-index: 100; min-width: 170px;
+  padding: 6px 0; overflow: hidden; animation: fadeUp .15s ease;
+}
+.dropdown-actions.active .dropdown-menu { display: block; }
+.dropdown-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 14px;
+  border: none; background: none; text-align: left; font-size: .82rem; font-weight: 600;
+  color: var(--text); cursor: pointer; transition: background .12s;
+}
+.dropdown-item:hover { background: var(--bg); color: var(--navy-800); }
+.dropdown-item.danger-item { color: var(--red); }
+.dropdown-item.danger-item:hover { background: var(--red-soft); color: var(--red-deep); }
+.dropdown-item.wa-item { color: #16a34a; }
+.dropdown-item.wa-item:hover { background: #dcfce7; color: #15803d; }
+
+/* ── CANVAS DE FIRMA DIGITAL ── */
+.sig-pad-wrap {
+  border: 2px dashed var(--border); border-radius: 12px; background: #fff;
+  padding: 10px; position: relative; text-align: center;
+}
+.sig-canvas {
+  width: 100%; height: 120px; border-radius: 8px; background: #fafbfc;
+  cursor: crosshair; touch-action: none; display: block;
+}
 
 .toast {
   position: fixed; bottom: 26px; right: 26px;
@@ -378,9 +415,9 @@ a.link:hover { color: var(--accent-deep); }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: #9fb0c4; }
 
-/* ── REGLAS DE IMPRESIÓN CORREGIDAS PARA PAGARÉ A PDF ── */
+/* ── REGLAS DE IMPRESIÓN CORREGIDAS PARA PAGARÉ Y RECIBOS EN PDF ── */
 @media print {
-  nav, header, .no-print, #loginScreen, #loadingOverlay, .toast {
+  nav, header, .no-print, #loginScreen, #loadingOverlay, .toast, .dropdown-menu {
     display: none !important;
   }
   html, body {
@@ -423,7 +460,7 @@ a.link:hover { color: var(--accent-deep); }
     background: transparent !important;
     overflow: visible !important;
   }
-  .pagare-doc {
+  .pagare-doc, .recibo-doc {
     border: 1.5px solid #102a4c !important;
     box-shadow: none !important;
     padding: 24px !important;
@@ -435,7 +472,7 @@ a.link:hover { color: var(--accent-deep); }
     width: 100% !important;
     box-sizing: border-box !important;
   }
-  .pagare-doc::before { display: none !important; }
+  .pagare-doc::before, .recibo-doc::before { display: none !important; }
 }
 
 /* ── Mobile ≤600px ── */

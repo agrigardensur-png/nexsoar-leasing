@@ -51,6 +51,104 @@ if (overlayEl) {
   overlayEl.addEventListener('click', e => { if (e.target.id === 'modalOverlay') closeModal() })
 }
 
+/* ── DROPDOWN ACTION MENUS ── */
+window.toggleDropdown = (btn, event) => {
+  if (event) event.stopPropagation()
+  const parent = btn.closest('.dropdown-actions')
+  const isActive = parent.classList.contains('active')
+  document.querySelectorAll('.dropdown-actions.active').forEach(d => d.classList.remove('active'))
+  if (!isActive) parent.classList.add('active')
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown-actions')) {
+    document.querySelectorAll('.dropdown-actions.active').forEach(d => d.classList.remove('active'))
+  }
+})
+
+/* ── EXPORTAR A CSV ── */
+window.exportCSV = (filename, headers, rows) => {
+  let csvContent = '\uFEFF' + headers.join(',') + '\n'
+  rows.forEach(row => {
+    const line = row.map(field => {
+      let val = field == null ? '' : String(field)
+      val = val.replace(/"/g, '""')
+      return `"${val}"`
+    }).join(',')
+    csvContent += line + '\n'
+  })
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', `${filename}_${todayISO()}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  toast(`Exportado a CSV: ${filename}`)
+}
+
+window.exportInventarioCSV = () => {
+  const headers = ['ID', 'Nombre', 'Grupo', 'Marca', 'Modelo', 'Serie', 'Costo Adquisicion', 'Precio Comercial', 'Precio Dia', 'Precio Semana', 'Precio Mes', 'Veces Rentada', 'Estatus']
+  const rows = S.machines.map(m => [
+    m.id, m.name, groupName(m.groupId), m.brand, m.model, m.serial,
+    m.purchaseCost, m.salePrice, m.dailyPrice, m.weeklyPrice, m.monthlyPrice, m.rentalCount, m.status
+  ])
+  window.exportCSV('Inventario_Maquinaria', headers, rows)
+}
+
+window.exportClientesCSV = () => {
+  const headers = ['ID', 'Nombre', 'Telefono', 'Correo', 'Direccion', 'RFC_ID', 'Tiene INE', 'Tiene Comprobante']
+  const rows = S.customers.map(c => [
+    c.id, c.name, c.phone, c.email, c.address, c.idNumber,
+    c.ineDoc ? 'SI' : 'NO', c.addressDoc ? 'SI' : 'NO'
+  ])
+  window.exportCSV('Catalogo_Clientes', headers, rows)
+}
+
+window.exportRentasCSV = () => {
+  const headers = ['ID', 'Maquina', 'Cliente', 'Modalidad', 'Cantidad', 'Precio Unitario', 'Total Cobrado', 'Abonado', 'Saldo Pendiente', 'Fecha Inicio', 'Devolución Esperada', 'Devolución Real', 'Estatus', 'Deposito']
+  const rows = S.rentals.map(r => {
+    const paid = r.amountPaid || (r.status === 'devuelta' ? r.totalCharged : 0)
+    const balance = Math.max(0, (r.totalCharged || 0) - paid)
+    return [
+      r.id, machineName(r.machineId), customerName(r.customerId), r.rentalType, r.qty,
+      r.unitPrice, r.totalCharged, paid, balance, r.startDate, r.expectedReturn, r.actualReturn || '', r.status, r.deposit
+    ]
+  })
+  window.exportCSV('Bitacora_Rentas', headers, rows)
+}
+
+/* ── ENVÍO DIRECTO POR WHATSAPP ── */
+window.openWhatsAppRental = rentalId => {
+  const r = S.rentals.find(x => x.id === rentalId)
+  if (!r) return
+  const c = S.customers.find(x => x.id === r.customerId)
+  const m = S.machines.find(x => x.id === r.machineId)
+  if (!c || !c.phone) {
+    toast('El cliente no tiene teléfono registrado')
+    return
+  }
+  let cleanPhone = c.phone.replace(/\D/g, '')
+  if (cleanPhone.length === 10) cleanPhone = '521' + cleanPhone
+  else if (cleanPhone.length === 12 && cleanPhone.startsWith('52')) cleanPhone = '521' + cleanPhone.slice(2)
+
+  const paid = r.amountPaid || (r.status === 'devuelta' ? r.totalCharged : 0)
+  const balance = Math.max(0, (r.totalCharged || 0) - paid)
+
+  const msg = `Hola *${c.name}*, te saludamos de *NexSoar System Leasing*.
+📌 *Detalles de tu Renta:*
+• Equipo: *${m ? m.name : 'Maquinaria'}*
+• Devolución esperada: *${fmtDate(r.expectedReturn)}*
+• Total cobrado: *${fmtMoney(r.totalCharged)}*
+• Abonado: *${fmtMoney(paid)}*
+• Saldo Pendiente: *${fmtMoney(balance)}*
+
+Agradecemos tu preferencia. Ante cualquier duda o extensión de renta, quedamos a tus órdenes.`
+
+  const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+  window.open(waUrl, '_blank')
+}
+
 /* ── CARGA INICIAL ── */
 async function fetchAll() {
   showLoading('Cargando datos…')
@@ -273,14 +371,19 @@ window.deleteGroup = async id => {
 function renderInventario() {
   const el = document.getElementById('view-inventario')
   el.innerHTML = `
-    <div class="toolbar"><h2 style="margin:0;">Inventario de maquinaria</h2>
-      <button class="btn" onclick="openMachineForm()">+ Dar de alta máquina</button></div>
+    <div class="toolbar">
+      <h2 style="margin:0;">Inventario de maquinaria</h2>
+      <div class="pill-row">
+        <button class="btn secondary" onclick="exportInventarioCSV()">📥 Exportar CSV</button>
+        <button class="btn" onclick="openMachineForm()">+ Dar de alta máquina</button>
+      </div>
+    </div>
     <div class="card">
       ${S.machines.length === 0 ? '<div class="empty">No hay máquinas registradas.</div>' : `
       <div class="table-scroll">
         <table><thead><tr>
           <th>Máquina</th><th>Grupo</th><th>Costo / Precio</th>
-          <th>Renta día / semana / mes</th><th>Veces rentada</th><th>Estatus</th><th></th>
+          <th>Renta día / semana / mes</th><th>Veces rentada</th><th>Estatus</th><th>Acciones</th>
         </tr></thead><tbody>
           ${S.machines.map(m => `<tr>
             <td><strong>${m.name}</strong><div class="small muted">${m.brand} ${m.model} · Serie: ${m.serial || '—'}</div></td>
@@ -289,10 +392,15 @@ function renderInventario() {
             <td>${fmtMoney(m.dailyPrice)} / ${fmtMoney(m.weeklyPrice)} / ${fmtMoney(m.monthlyPrice)}</td>
             <td>${m.rentalCount || 0}</td>
             <td>${statusBadge(m.status)}</td>
-            <td><div class="pill-row">
-              <button class="btn small secondary" onclick="openMachineForm('${m.id}')">Editar</button>
-              <button class="btn small danger" onclick="deleteMachine('${m.id}')">Eliminar</button>
-            </div></td>
+            <td>
+              <div class="dropdown-actions">
+                <button class="btn-dots" onclick="toggleDropdown(this, event)">⋮</button>
+                <div class="dropdown-menu">
+                  <button class="dropdown-item" onclick="openMachineForm('${m.id}')">✏️ Editar máquina</button>
+                  <button class="dropdown-item danger-item" onclick="deleteMachine('${m.id}')">🗑️ Eliminar máquina</button>
+                </div>
+              </div>
+            </td>
           </tr>`).join('')}
         </tbody></table>
       </div>`}
@@ -460,13 +568,18 @@ window.deleteMaintenance = async id => {
 function renderClientes() {
   const el = document.getElementById('view-clientes')
   el.innerHTML = `
-    <div class="toolbar"><h2 style="margin:0;">Clientes</h2>
-      <button class="btn" onclick="openCustomerForm()">+ Nuevo cliente</button></div>
+    <div class="toolbar">
+      <h2 style="margin:0;">Clientes</h2>
+      <div class="pill-row">
+        <button class="btn secondary" onclick="exportClientesCSV()">📥 Exportar CSV</button>
+        <button class="btn" onclick="openCustomerForm()">+ Nuevo cliente</button>
+      </div>
+    </div>
     <div class="card">
       ${S.customers.length === 0 ? '<div class="empty">No hay clientes registrados.</div>' : `
       <div class="table-scroll">
         <table><thead><tr>
-          <th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Dirección</th><th>RFC / ID</th><th>Documentos</th><th>Rentas</th><th></th>
+          <th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Dirección</th><th>RFC / ID</th><th>Documentos</th><th>Rentas</th><th>Acciones</th>
         </tr></thead><tbody>
           ${S.customers.map(c => {
             const n = S.rentals.filter(r => r.customerId === c.id).length
@@ -474,10 +587,15 @@ function renderClientes() {
               <td><strong>${c.name}</strong></td><td>${c.phone || '—'}</td><td>${c.email || '—'}</td>
               <td>${c.address || '—'}</td><td>${c.idNumber || '—'}</td>
               <td>${docsCell(c)}</td><td>${n}</td>
-              <td><div class="pill-row">
-                <button class="btn small secondary" onclick="openCustomerForm('${c.id}')">Editar</button>
-                <button class="btn small danger" onclick="deleteCustomer('${c.id}')">Eliminar</button>
-              </div></td>
+              <td>
+                <div class="dropdown-actions">
+                  <button class="btn-dots" onclick="toggleDropdown(this, event)">⋮</button>
+                  <div class="dropdown-menu">
+                    <button class="dropdown-item" onclick="openCustomerForm('${c.id}')">✏️ Editar cliente</button>
+                    <button class="dropdown-item danger-item" onclick="deleteCustomer('${c.id}')">🗑️ Eliminar cliente</button>
+                  </div>
+                </div>
+              </td>
             </tr>`
           }).join('')}
         </tbody></table>
@@ -671,43 +789,65 @@ function renderRentas() {
   const el = document.getElementById('view-rentas')
   const sorted = [...S.rentals].sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''))
   el.innerHTML = `
-    <div class="toolbar"><h2 style="margin:0;">Bitácora de rentas</h2>
-      <button class="btn" onclick="openRentalForm()">+ Nueva renta (genera pagaré)</button></div>
+    <div class="toolbar">
+      <h2 style="margin:0;">Bitácora de rentas</h2>
+      <div class="pill-row">
+        <button class="btn secondary" onclick="exportRentasCSV()">📥 Exportar CSV</button>
+        <button class="btn" onclick="openRentalForm()">+ Nueva renta (genera pagaré)</button>
+      </div>
+    </div>
     <div class="card">
       ${sorted.length === 0 ? '<div class="empty">No se ha registrado ninguna renta.</div>' : `
       <div class="table-scroll">
         <table><thead><tr>
-          <th>Máquina</th><th>Cliente</th><th>Modalidad</th><th>Inicio</th><th>Dev. esperada</th>
-          <th>Dev. real</th><th>Total cobrado</th><th>Estatus</th><th></th>
+          <th>Máquina</th><th>Cliente</th><th>Modalidad</th><th>Inicio / Dev. esperada</th>
+          <th>Total</th><th>Abonado</th><th>Saldo Pendiente</th><th>Estatus</th><th>Acciones</th>
         </tr></thead><tbody>
           ${sorted.map(r => {
+            const paid = r.amountPaid || (r.status === 'devuelta' ? r.totalCharged : 0)
+            const balance = Math.max(0, (r.totalCharged || 0) - paid)
             const badge = r.status === 'devuelta' ? '<span class="badge muted">Devuelta</span>' :
               r.expectedReturn < todayISO() ? '<span class="badge danger">Atrasada</span>' : '<span class="badge ok">Activa</span>'
             return `<tr>
-              <td>${machineName(r.machineId)}</td><td>${customerName(r.customerId)}</td>
-              <td>${rtLabel(r.rentalType)}</td><td>${fmtDate(r.startDate)}</td>
-              <td>${fmtDate(r.expectedReturn)}</td><td>${r.actualReturn ? fmtDate(r.actualReturn) : '—'}</td>
-              <td>${fmtMoney(r.totalCharged)}</td><td>${badge}</td>
-              <td><div class="pill-row">
-                ${r.pagareId ? `<button class="btn small secondary" onclick="viewPagare('${r.pagareId}')">Ver pagaré</button>` : ''}
-                ${r.status === 'activa' ? `<button class="btn small" onclick="markReturned('${r.id}')">Marcar devuelta</button>` : ''}
-                <button class="btn small danger" onclick="deleteRental('${r.id}')">Eliminar</button>
-              </div></td>
+              <td><strong>${machineName(r.machineId)}</strong></td>
+              <td>${customerName(r.customerId)}</td>
+              <td>${rtLabel(r.rentalType)} × ${r.qty}</td>
+              <td>${fmtDate(r.startDate)}<br><span class="small muted">Dev: ${fmtDate(r.expectedReturn)}</span></td>
+              <td><strong>${fmtMoney(r.totalCharged)}</strong></td>
+              <td style="color:var(--teal-deep);font-weight:700;">${fmtMoney(paid)}</td>
+              <td><strong style="color:${balance > 0 ? 'var(--red)' : 'var(--teal-deep)'}">${fmtMoney(balance)}</strong></td>
+              <td>${badge}</td>
+              <td>
+                <div class="dropdown-actions">
+                  <button class="btn-dots" onclick="toggleDropdown(this, event)">⋮</button>
+                  <div class="dropdown-menu">
+                    ${r.pagareId ? `<button class="dropdown-item" onclick="viewPagare('${r.pagareId}')">📄 Ver Pagaré</button>` : ''}
+                    <button class="dropdown-item wa-item" onclick="openWhatsAppRental('${r.id}')">📲 Enviar WhatsApp</button>
+                    <button class="dropdown-item" onclick="openPaymentModal('${r.id}')">💳 Registrar Abono / Pago</button>
+                    ${r.status === 'activa' ? `<button class="dropdown-item" onclick="markReturned('${r.id}')">🔄 Marcar devuelta</button>` : ''}
+                    <button class="dropdown-item danger-item" onclick="deleteRental('${r.id}')">🗑️ Eliminar renta</button>
+                  </div>
+                </div>
+              </td>
             </tr>`
           }).join('')}
         </tbody></table>
       </div>`}
     </div>`
 }
+
 const rtLabel = t => ({ dia: 'Diaria', semana: 'Semanal', mes: 'Mensual' })[t] || t
 const unitPrice = (m, t) => t === 'dia' ? m.dailyPrice : t === 'semana' ? m.weeklyPrice : m.monthlyPrice
 const retDate = (s, t, q) => t === 'dia' ? addDays(s, q) : t === 'semana' ? addDays(s, q * 7) : addMonths(s, q)
+
+let _hasDrawnSig = false
 
 window.openRentalForm = () => {
   const avail = S.machines.filter(m => m.status === 'disponible')
   if (!avail.length) { toast('No hay máquinas disponibles'); return }
   if (!S.customers.length) { toast('Primero registra un cliente'); return }
-  openModal(`<h2>Nueva renta</h2>
+  _hasDrawnSig = false
+  openModal(`<h2>Nueva renta y pagaré</h2>
     <div class="form-grid">
       <label>Máquina disponible<select id="r_mach" onchange="previewRental()">${avail.map(m => `<option value="${m.id}">${m.name} — ${m.model}</option>`).join('')}</select></label>
       <label>Cliente<select id="r_cust">${S.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select></label>
@@ -720,12 +860,86 @@ window.openRentalForm = () => {
     <div class="card" style="margin-top:14px;background:linear-gradient(120deg,var(--teal-soft),#f3fbf9);border:none;">
       <div id="r_prev" class="small"></div>
     </div>
+    <h3 style="margin-top:18px;">Firma Digital Táctil del Cliente</h3>
+    <div class="sig-pad-wrap">
+      <canvas id="sigCanvas" class="sig-canvas" width="620" height="130"></canvas>
+      <div class="flex-between" style="margin-top:8px;">
+        <span class="small muted">Traza la firma con el dedo, stylus o mouse</span>
+        <button type="button" class="btn small secondary" onclick="clearSignature()">Limpiar firma</button>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn" onclick="saveRental()">Generar renta y pagaré</button>
     </div>`)
+
   window.previewRental()
+  setTimeout(initSigCanvas, 100)
 }
+
+function initSigCanvas() {
+  const canvas = document.getElementById('sigCanvas')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  ctx.strokeStyle = '#102a4c'
+  ctx.lineWidth = 2.5
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+
+  let isDrawing = false
+  let lastX = 0, lastY = 0
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    }
+  }
+
+  function startDraw(e) {
+    e.preventDefault()
+    isDrawing = true
+    _hasDrawnSig = true
+    const pos = getPos(e)
+    lastX = pos.x; lastY = pos.y
+  }
+
+  function draw(e) {
+    if (!isDrawing) return
+    e.preventDefault()
+    const pos = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(lastX, lastY)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+    lastX = pos.x; lastY = pos.y
+  }
+
+  function stopDraw(e) {
+    isDrawing = false
+  }
+
+  canvas.addEventListener('mousedown', startDraw)
+  canvas.addEventListener('mousemove', draw)
+  canvas.addEventListener('mouseup', stopDraw)
+  canvas.addEventListener('mouseleave', stopDraw)
+
+  canvas.addEventListener('touchstart', startDraw, { passive: false })
+  canvas.addEventListener('touchmove', draw, { passive: false })
+  canvas.addEventListener('touchend', stopDraw)
+}
+
+window.clearSignature = () => {
+  const canvas = document.getElementById('sigCanvas')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  _hasDrawnSig = false
+}
+
 window.previewRental = () => {
   const mId = document.getElementById('r_mach')?.value; if (!mId) return
   const m = S.machines.find(x => x.id === mId), type = document.getElementById('r_type').value
@@ -736,6 +950,7 @@ window.previewRental = () => {
   const ul = { dia: 'día', semana: 'semana', mes: 'mes' }[type]
   document.getElementById('r_prev').innerHTML = `<strong>Resumen:</strong> ${qty} ${ul}${qty > 1 ? 's' : ''} × ${fmtMoney(unit)} = <strong>${fmtMoney(total)}</strong> · Devolución: <strong>${fmtDate(ret)}</strong> · Valor máquina (pagaré): <strong>${fmtMoney(m.salePrice)}</strong>`
 }
+
 window.saveRental = async () => {
   const machineId = document.getElementById('r_mach').value
   const customerId = document.getElementById('r_cust').value
@@ -746,28 +961,44 @@ window.saveRental = async () => {
   const deposit = Number(document.getElementById('r_dep').value) || 0
   const machine = S.machines.find(m => m.id === machineId)
   const unit = unitPrice(machine, type), total = unit * qty
+
+  let signatureData = null
+  if (_hasDrawnSig) {
+    const canvas = document.getElementById('sigCanvas')
+    if (canvas) signatureData = canvas.toDataURL('image/png')
+  }
+
   showLoading('Generando renta y pagaré…')
   try {
     const { data: fData } = await sb.from('pagares').select('folio').order('folio', { ascending: false }).limit(1).maybeSingle()
     const folio = (fData?.folio || 0) + 1
-    const { data: rent, error: re } = await sb.from('rentals').insert({
+
+    const rentalRow = {
       user_id: ME.id, machine_id: machineId, customer_id: customerId,
       rental_type: type, qty, unit_price: unit, total_charged: total,
-      start_date: start, expected_return: expectedReturn, status: 'activa', deposit
-    }).select().single()
+      amount_paid: 0, start_date: start, expected_return: expectedReturn,
+      status: 'activa', deposit, signature_data: signatureData
+    }
+
+    const { data: rent, error: re } = await sb.from('rentals').insert(rentalRow).select().single()
     if (re) throw re
 
-    const { data: pg, error: pe } = await sb.from('pagares').insert({
+    const pagareRow = {
       user_id: ME.id, folio, rental_id: rent.id,
       machine_id: machineId, customer_id: customerId, machine_value: machine.salePrice,
       rental_type: type, unit_price: unit, qty, total_charged: total,
-      issue_date: start, expected_return: expectedReturn, deposit
-    }).select().single()
+      issue_date: start, expected_return: expectedReturn, deposit, signature_data: signatureData
+    }
+
+    const { data: pg, error: pe } = await sb.from('pagares').insert(pagareRow).select().single()
     if (pe) throw pe
 
     await sb.from('rentals').update({ pagare_id: pg.id }).eq('id', rent.id)
     await sb.from('machines').update({ status: 'rentada', rental_count: (machine.rentalCount || 0) + 1 }).eq('id', machineId)
     rent.pagare_id = pg.id
+    rent.signature_data = signatureData
+    pg.signature_data = signatureData
+
     S.rentals.push(mapRental(rent))
     S.pagares.push(mapPagare(pg))
     machine.status = 'rentada'; machine.rentalCount = (machine.rentalCount || 0) + 1
@@ -775,6 +1006,101 @@ window.saveRental = async () => {
     renderRentas(); viewPagare(pg.id)
   } catch (e) { toast('Error: ' + (e.message || e)); console.error(e) } finally { hideLoading() }
 }
+
+/* ── ABONOS Y REGISTRO DE PAGOS ── */
+window.openPaymentModal = rentalId => {
+  const r = S.rentals.find(x => x.id === rentalId)
+  if (!r) return
+  const paid = r.amountPaid || (r.status === 'devuelta' ? r.totalCharged : 0)
+  const balance = Math.max(0, (r.totalCharged || 0) - paid)
+
+  openModal(`<h2>Registrar Abono / Pago</h2>
+    <p class="small muted">Máquina: <strong>${machineName(r.machineId)}</strong> · Cliente: <strong>${customerName(r.customerId)}</strong></p>
+    <div class="card" style="margin-bottom:14px;background:#f8fafc;">
+      <div class="flex-between"><span>Total Renta:</span><strong>${fmtMoney(r.totalCharged)}</strong></div>
+      <div class="flex-between" style="color:var(--teal-deep);"><span>Abonado Previo:</span><strong>${fmtMoney(paid)}</strong></div>
+      <div class="flex-between" style="color:${balance > 0 ? 'var(--red)' : 'var(--teal-deep)'};font-size:1.05rem;"><span>Saldo Actual:</span><strong>${fmtMoney(balance)}</strong></div>
+    </div>
+    <div class="form-grid">
+      <label>Monto a Abonar ($)<input id="p_amount" type="number" min="0.01" step="0.01" value="${balance}"></label>
+      <label>Fecha de Pago<input id="p_date" type="date" value="${todayISO()}"></label>
+      <label>Método de Pago
+        <select id="p_method">
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia bancaria</option>
+          <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
+        </select>
+      </label>
+      <label>Notas / Referencia<input id="p_notes" type="text" placeholder="Ej. Folio de transferencia #1234"></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn green" onclick="savePayment('${rentalId}')">Guardar Abono y Generar Recibo</button>
+    </div>`)
+}
+
+window.savePayment = async rentalId => {
+  const r = S.rentals.find(x => x.id === rentalId)
+  if (!r) return
+  const amount = Number(document.getElementById('p_amount').value) || 0
+  const date = document.getElementById('p_date').value || todayISO()
+  const method = document.getElementById('p_method').value
+  const notes = document.getElementById('p_notes').value.trim()
+
+  if (amount <= 0) { toast('Ingresa un monto válido'); return }
+
+  const currentPaid = r.amountPaid || 0
+  const newPaid = currentPaid + amount
+
+  showLoading('Registrando abono…')
+  try {
+    const { error } = await sb.from('rentals').update({ amount_paid: newPaid }).eq('id', rentalId)
+    if (error) throw error
+    r.amountPaid = newPaid
+    closeModal()
+    toast(`Abono de ${fmtMoney(amount)} registrado con éxito`)
+    renderRentas()
+    viewRecibo(rentalId, amount, date, method, notes)
+  } catch (e) { toast('Error registrando abono: ' + (e.message || e)) } finally { hideLoading() }
+}
+
+window.viewRecibo = (rentalId, amount, date, method, notes) => {
+  const r = S.rentals.find(x => x.id === rentalId)
+  if (!r) return
+  const m = S.machines.find(x => x.id === r.machineId)
+  const c = S.customers.find(x => x.id === r.customerId)
+  const total = r.totalCharged || 0
+  const totalPaid = r.amountPaid || amount
+  const balance = Math.max(0, total - totalPaid)
+  const arrendadorNombre = DEFAULT_ARRENDADOR_NAME
+
+  openModal(`
+    <div class="recibo-doc" id="reciboDoc">
+      <div class="letterhead">
+        <img src="Logo.jpg" alt="NexSoar" onerror="this.style.display='none'">
+        <div><div class="lh-name">NexSoar System Leasing</div><div class="lh-tag">Recibo Oficial de Pago</div></div>
+      </div>
+      <h3>Recibo de Pago — Renta de Maquinaria</h3>
+      <p><strong>Fecha de pago:</strong> ${fmtDate(date)} &nbsp;|&nbsp; <strong>Método:</strong> ${method}</p>
+      <p>Recibimos de <strong>${c ? c.name : '—'}</strong> la cantidad de <strong>${fmtMoney(amount)}</strong> por concepto de abono/pago de arrendamiento del equipo <strong>${m ? m.name : '—'}</strong>.</p>
+      <table style="margin:14px 0;">
+        <tr><td class="muted" style="width:45%;">Total de la Renta</td><td style="text-align:right;"><strong>${fmtMoney(total)}</strong></td></tr>
+        <tr><td class="muted">Abono Recibido Hoy</td><td style="text-align:right;color:var(--teal-deep);"><strong>${fmtMoney(amount)}</strong></td></tr>
+        <tr><td class="muted">Total Acumulado Pagado</td><td style="text-align:right;"><strong>${fmtMoney(totalPaid)}</strong></td></tr>
+        <tr><td class="muted"><strong>Saldo Restante Pendiente</strong></td><td style="text-align:right;"><strong style="color:${balance > 0 ? 'var(--red)' : 'var(--teal-deep)'}">${fmtMoney(balance)}</strong></td></tr>
+      </table>
+      ${notes ? `<p class="small muted">Notas / Referencia: ${notes}</p>` : ''}
+      <div class="sig">
+        <div><strong>${c ? c.name : '—'}</strong><br><span class="small muted">Firma del cliente</span></div>
+        <div><strong>${arrendadorNombre}</strong><br><span class="small muted">Firma de conformidad</span></div>
+      </div>
+    </div>
+    <div class="modal-actions no-print">
+      <button class="btn secondary" onclick="closeModal()">Cerrar</button>
+      <button class="btn" onclick="window.print()">Imprimir / Guardar PDF</button>
+    </div>`)
+}
+
 window.markReturned = id => {
   const r = S.rentals.find(x => x.id === id); if (!r) return
   openModal(`<h2>Registrar devolución</h2>
@@ -791,6 +1117,7 @@ window.markReturned = id => {
       <button class="btn" onclick="confirmReturn('${id}')">Confirmar devolución</button>
     </div>`)
 }
+
 window.confirmReturn = async id => {
   const r = S.rentals.find(x => x.id === id)
   const date = document.getElementById('ret_date').value || todayISO()
@@ -798,15 +1125,16 @@ window.confirmReturn = async id => {
   const newStatus = cond === 'requiere_mantenimiento' ? 'mantenimiento' : 'disponible'
   showLoading('Registrando…')
   try {
-    const { error: re } = await sb.from('rentals').update({ actual_return: date, status: 'devuelta' }).eq('id', id)
+    const { error: re } = await sb.from('rentals').update({ actual_return: date, status: 'devuelta', amount_paid: r.totalCharged }).eq('id', id)
     if (re) throw re
     const { error: me } = await sb.from('machines').update({ status: newStatus }).eq('id', r.machineId)
     if (me) throw me
-    r.actualReturn = date; r.status = 'devuelta'
+    r.actualReturn = date; r.status = 'devuelta'; r.amountPaid = r.totalCharged
     S.machines.find(m => m.id === r.machineId).status = newStatus
     closeModal(); toast('Devolución registrada'); renderRentas()
   } catch (e) { toast('Error: ' + (e.message || e)) } finally { hideLoading() }
 }
+
 window.deleteRental = async id => {
   const r = S.rentals.find(x => x.id === id)
   if (!r) return
@@ -843,14 +1171,16 @@ window.deleteRental = async id => {
   }
 }
 
-/* ── PAGARÉ CON NOMBRE DEL ARRENDADOR Y VISTA COMPLETA DE IMPRESIÓN ── */
+/* ── PAGARÉ CON NOMBRE DEL ARRENDADOR, FIRMA DIGITAL Y IMPRESIÓN COMPLETA ── */
 window.viewPagare = id => {
   const p = S.pagares.find(x => x.id === id); if (!p) { toast('Pagaré no encontrado'); return }
   const m = S.machines.find(x => x.id === p.machineId)
   const c = S.customers.find(x => x.id === p.customerId)
+  const r = S.rentals.find(x => x.id === p.rentalId)
   const ul = { dia: 'día', semana: 'semana', mes: 'mes' }[p.rentalType]
   const rlbl = p.rentalType === 'dia' ? 'diaria' : p.rentalType === 'semana' ? 'semanal' : 'mensual'
   const arrendadorNombre = DEFAULT_ARRENDADOR_NAME
+  const sigData = p.signatureData || (r ? r.signatureData : null)
 
   openModal(`
     <div class="pagare-doc" id="pagareDoc">
@@ -871,8 +1201,13 @@ window.viewPagare = id => {
       <p>Periodo: del <strong>${fmtDate(p.issueDate)}</strong> al <strong>${fmtDate(p.expectedReturn)}</strong>.${p.deposit > 0 ? ' Depósito en garantía: <strong>' + fmtMoney(p.deposit) + '</strong>.' : ''}</p>
       <p>En caso de no devolverse la máquina en la fecha pactada, esta obligación se hará exigible por el valor total señalado, conforme a la legislación aplicable en materia de títulos de crédito.</p>
       <div class="sig">
-        <div><strong>${c ? c.name : '—'}</strong><br><span class="small muted">Firma del cliente / arrendatario</span></div>
-        <div><strong>${arrendadorNombre}</strong><br><span class="small muted">Firma del arrendador</span></div>
+        <div>
+          ${sigData ? `<img src="${sigData}" alt="Firma Cliente" style="max-height:55px;display:block;margin:0 auto 4px;">` : ''}
+          <strong>${c ? c.name : '—'}</strong><br><span class="small muted">Firma del cliente / arrendatario</span>
+        </div>
+        <div>
+          <strong>${arrendadorNombre}</strong><br><span class="small muted">Firma del arrendador</span>
+        </div>
       </div>
     </div>
     <div class="section-note no-print" style="margin-top:14px;">Plantilla generada automáticamente para NexSoar System Leasing. Se recomienda revisión legal antes de uso formal.</div>

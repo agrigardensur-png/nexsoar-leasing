@@ -16,6 +16,12 @@ export function setME(user) { ME = user }
 export function setCurrentProfile(prof) { currentProfile = prof }
 export function setModalClose(fn) { _modalClose = fn }
 
+/* ── LOCAL STORAGE FALLBACKS FOR EXTENDED DATA ── */
+export const getLocalPaid = id => Number(localStorage.getItem('nexsoar_paid_' + id)) || 0
+export const setLocalPaid = (id, amt) => localStorage.setItem('nexsoar_paid_' + id, amt)
+export const getLocalSig = id => localStorage.getItem('nexsoar_sig_' + id) || null
+export const setLocalSig = (id, sig) => { if (sig) localStorage.setItem('nexsoar_sig_' + id, sig) }
+
 /* ── HELPERS DE FORMATO ── */
 export const todayISO = () => new Date().toISOString().slice(0, 10)
 export const fmtMoney = n => '$' + (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -48,21 +54,30 @@ export const mapMaint = r => ({
   id: r.id, machineId: r.machine_id, date: r.date,
   type: r.type || 'preventivo', cost: Number(r.cost) || 0, description: r.description || ''
 })
-export const mapRental = r => ({
-  id: r.id, machineId: r.machine_id, customerId: r.customer_id,
-  rentalType: r.rental_type, qty: r.qty,
-  unitPrice: Number(r.unit_price) || 0, totalCharged: Number(r.total_charged) || 0,
-  amountPaid: Number(r.amount_paid != null ? r.amount_paid : (r.amountPaid != null ? r.amountPaid : (r.status === 'devuelta' ? r.total_charged : 0))) || 0,
-  startDate: r.start_date, expectedReturn: r.expected_return, actualReturn: r.actual_return || null,
-  status: r.status || 'activa', deposit: Number(r.deposit) || 0, pagareId: r.pagare_id || null,
-  signatureData: r.signature_data || r.signatureData || null
-})
-export const mapPagare = r => ({
-  id: r.id, folio: r.folio, rentalId: r.rental_id,
-  machineId: r.machine_id, customerId: r.customer_id,
-  machineValue: Number(r.machine_value) || 0, rentalType: r.rental_type,
-  unitPrice: Number(r.unit_price) || 0, qty: r.qty,
-  totalCharged: Number(r.total_charged) || 0,
-  issueDate: r.issue_date, expectedReturn: r.expected_return, deposit: Number(r.deposit) || 0,
-  signatureData: r.signature_data || r.signatureData || null
-})
+export const mapRental = r => {
+  const localPaid = getLocalPaid(r.id)
+  const localSig = getLocalSig(r.id)
+  const dbPaid = r.amount_paid != null ? Number(r.amount_paid) : null
+  const paidVal = dbPaid != null ? dbPaid : (localPaid || (r.status === 'devuelta' ? Number(r.total_charged || 0) : 0))
+  return {
+    id: r.id, machineId: r.machine_id, customerId: r.customer_id,
+    rentalType: r.rental_type, qty: r.qty,
+    unitPrice: Number(r.unit_price) || 0, totalCharged: Number(r.total_charged) || 0,
+    amountPaid: paidVal,
+    startDate: r.start_date, expectedReturn: r.expected_return, actualReturn: r.actual_return || null,
+    status: r.status || 'activa', deposit: Number(r.deposit) || 0, pagareId: r.pagare_id || null,
+    signatureData: r.signature_data || localSig || null
+  }
+}
+export const mapPagare = r => {
+  const localSig = getLocalSig(r.rental_id || r.id)
+  return {
+    id: r.id, folio: r.folio, rentalId: r.rental_id,
+    machineId: r.machine_id, customerId: r.customer_id,
+    machineValue: Number(r.machine_value) || 0, rentalType: r.rental_type,
+    unitPrice: Number(r.unit_price) || 0, qty: r.qty,
+    totalCharged: Number(r.total_charged) || 0,
+    issueDate: r.issue_date, expectedReturn: r.expected_return, deposit: Number(r.deposit) || 0,
+    signatureData: r.signature_data || localSig || null
+  }
+}

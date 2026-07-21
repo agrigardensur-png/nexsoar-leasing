@@ -2,7 +2,8 @@ import {
   sb, SUPABASE_URL, EDGE_URL, S, ME, currentProfile, _modalClose,
   setME, setCurrentProfile, setModalClose,
   todayISO, fmtMoney, fmtDate, daysBetween, addDays, addMonths,
-  mapGroup, mapMachine, mapCustomer, mapMaint, mapRental, mapPagare
+  mapGroup, mapMachine, mapCustomer, mapMaint, mapRental, mapPagare,
+  setLocalPaid, setLocalSig, getLocalPaid, getLocalSig
 } from './supabase-client.js'
 
 /* ── NOMBRE DEL ARRENDADOR CONSTANTE ── */
@@ -976,8 +977,8 @@ window.saveRental = async () => {
     const rentalRow = {
       user_id: ME.id, machine_id: machineId, customer_id: customerId,
       rental_type: type, qty, unit_price: unit, total_charged: total,
-      amount_paid: 0, start_date: start, expected_return: expectedReturn,
-      status: 'activa', deposit, signature_data: signatureData
+      start_date: start, expected_return: expectedReturn,
+      status: 'activa', deposit
     }
 
     const { data: rent, error: re } = await sb.from('rentals').insert(rentalRow).select().single()
@@ -987,7 +988,7 @@ window.saveRental = async () => {
       user_id: ME.id, folio, rental_id: rent.id,
       machine_id: machineId, customer_id: customerId, machine_value: machine.salePrice,
       rental_type: type, unit_price: unit, qty, total_charged: total,
-      issue_date: start, expected_return: expectedReturn, deposit, signature_data: signatureData
+      issue_date: start, expected_return: expectedReturn, deposit
     }
 
     const { data: pg, error: pe } = await sb.from('pagares').insert(pagareRow).select().single()
@@ -996,11 +997,16 @@ window.saveRental = async () => {
     await sb.from('rentals').update({ pagare_id: pg.id }).eq('id', rent.id)
     await sb.from('machines').update({ status: 'rentada', rental_count: (machine.rentalCount || 0) + 1 }).eq('id', machineId)
     rent.pagare_id = pg.id
-    rent.signature_data = signatureData
-    pg.signature_data = signatureData
 
-    S.rentals.push(mapRental(rent))
-    S.pagares.push(mapPagare(pg))
+    if (signatureData) {
+      setLocalSig(rent.id, signatureData)
+    }
+
+    const rentMapped = mapRental(rent)
+    const pgMapped = mapPagare(pg)
+
+    S.rentals.push(rentMapped)
+    S.pagares.push(pgMapped)
     machine.status = 'rentada'; machine.rentalCount = (machine.rentalCount || 0) + 1
     closeModal(); toast('Renta registrada — Folio #' + folio)
     renderRentas(); viewPagare(pg.id)
@@ -1054,9 +1060,15 @@ window.savePayment = async rentalId => {
 
   showLoading('Registrando abono…')
   try {
-    const { error } = await sb.from('rentals').update({ amount_paid: newPaid }).eq('id', rentalId)
-    if (error) throw error
+    try {
+      await sb.from('rentals').update({ amount_paid: newPaid }).eq('id', rentalId)
+    } catch (e) {
+      console.warn("Columna amount_paid no disponible en el servidor Supabase.", e)
+    }
+    
+    setLocalPaid(rentalId, newPaid)
     r.amountPaid = newPaid
+    
     closeModal()
     toast(`Abono de ${fmtMoney(amount)} registrado con éxito`)
     renderRentas()
@@ -1125,11 +1137,13 @@ window.confirmReturn = async id => {
   const newStatus = cond === 'requiere_mantenimiento' ? 'mantenimiento' : 'disponible'
   showLoading('Registrando…')
   try {
-    const { error: re } = await sb.from('rentals').update({ actual_return: date, status: 'devuelta', amount_paid: r.totalCharged }).eq('id', id)
+    const { error: re } = await sb.from('rentals').update({ actual_return: date, status: 'devuelta' }).eq('id', id)
     if (re) throw re
     const { error: me } = await sb.from('machines').update({ status: newStatus }).eq('id', r.machineId)
     if (me) throw me
-    r.actualReturn = date; r.status = 'devuelta'; r.amountPaid = r.totalCharged
+    r.actualReturn = date; r.status = 'devuelta'
+    setLocalPaid(id, r.totalCharged)
+    r.amountPaid = r.totalCharged
     S.machines.find(m => m.id === r.machineId).status = newStatus
     closeModal(); toast('Devolución registrada'); renderRentas()
   } catch (e) { toast('Error: ' + (e.message || e)) } finally { hideLoading() }
@@ -1160,6 +1174,9 @@ window.deleteRental = async id => {
       machine.rentalCount = newCount
     }
 
+    localStorage.removeItem('nexsoar_paid_' + id)
+    localStorage.removeItem('nexsoar_sig_' + id)
+
     S.rentals = S.rentals.filter(x => x.id !== id)
     toast('Registro de renta eliminado')
     renderRentas()
@@ -1180,7 +1197,7 @@ window.viewPagare = id => {
   const ul = { dia: 'día', semana: 'semana', mes: 'mes' }[p.rentalType]
   const rlbl = p.rentalType === 'dia' ? 'diaria' : p.rentalType === 'semana' ? 'semanal' : 'mensual'
   const arrendadorNombre = DEFAULT_ARRENDADOR_NAME
-  const sigData = p.signatureData || (r ? r.signatureData : null)
+  const sigData = p.signatureData || (r ? r.signatureData : null) || getLocalSig(p.rentalId || p.id)
 
   openModal(`
     <div class="pagare-doc" id="pagareDoc">
@@ -1217,9 +1234,7 @@ window.viewPagare = id => {
     </div>`)
 }
 
-/* ═══════════════════════════════════
-   ALERTAS DE DEVOLUCIÓN
-═══════════════════════════════════ */
+/* ── ALERTAS DE DEVOLUCIÓN ── */
 function renderAlertas() {
   const el = document.getElementById('view-alertas')
   const over = overdueRentals(), soon = dueSoonRentals(3)
@@ -1254,9 +1269,7 @@ function renderAlertas() {
     <div class="section-note" style="margin-top:16px;">Calculadas automáticamente. Hoy: ${fmtDate(todayISO())}.</div>`
 }
 
-/* ═══════════════════════════════════
-   DASHBOARD
-═══════════════════════════════════ */
+/* ── DASHBOARD ── */
 function renderDashboard() {
   const el = document.getElementById('view-dashboard')
   const total = S.machines.length
@@ -1304,9 +1317,7 @@ function topTable() {
   </tbody></table></div>`
 }
 
-/* ═══════════════════════════════════
-   REPORTES DE RENTABILIDAD
-═══════════════════════════════════ */
+/* ── REPORTES DE RENTABILIDAD ── */
 function renderReportes() {
   const el = document.getElementById('view-reportes')
   if (!S.machines.length) {
@@ -1340,9 +1351,7 @@ function renderReportes() {
     </div>`
 }
 
-/* ═══════════════════════════════════
-   GESTIÓN DE USUARIOS
-═══════════════════════════════════ */
+/* ── GESTIÓN DE USUARIOS ── */
 async function renderUsuarios() {
   if (currentProfile?.role !== 'admin') {
     document.getElementById('view-usuarios').innerHTML = '<div class="empty">Acceso restringido.</div>'
@@ -1447,9 +1456,7 @@ window.deleteUser = async (userId, userEmail) => {
   } catch (e) { toast('Error: ' + e.message) } finally { hideLoading() }
 }
 
-/* ═══════════════════════════════════
-   NAVEGACIÓN Y PESTAÑAS
-═══════════════════════════════════ */
+/* ── NAVEGACIÓN Y PESTAÑAS ── */
 const TABS = [
   { id: 'dashboard', label: 'Panel', icon: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z' },
   { id: 'inventario', label: 'Inventario', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },

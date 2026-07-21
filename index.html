@@ -279,6 +279,22 @@
 <div class="toast" id="toast"></div>
 <div id="loadingOverlay"><div class="box" id="loadingMsg">Cargando…</div></div>
 
+<!-- Firma Digital Pantalla Completa -->
+<div id="sigFullscreenOverlay">
+  <div class="fs-sig-header">
+    <h3>Firma Digital Táctil (Pantalla Completa)</h3>
+  </div>
+  <div class="fs-sig-canvas-wrap">
+    <canvas id="fsSigCanvas"></canvas>
+  </div>
+  <div class="fs-sig-actions">
+    <button class="btn secondary" onclick="closeFullscreenSig()">Cancelar</button>
+    <button class="btn secondary" onclick="clearFullscreenSig()">Limpiar</button>
+    <button class="btn green" onclick="acceptFullscreenSig()">✓ Aceptar Firma</button>
+  </div>
+</div>
+
+
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -866,7 +866,10 @@ window.openRentalForm = () => {
       <canvas id="sigCanvas" class="sig-canvas" width="620" height="130"></canvas>
       <div class="flex-between" style="margin-top:8px;">
         <span class="small muted">Traza la firma con el dedo, stylus o mouse</span>
-        <button type="button" class="btn small secondary" onclick="clearSignature()">Limpiar firma</button>
+        <div class="pill-row">
+          <button type="button" class="btn small" style="background:var(--navy-600);" onclick="openFullscreenSig()">📱 Pantalla Completa</button>
+          <button type="button" class="btn small secondary" onclick="clearSignature()">Limpiar firma</button>
+        </div>
       </div>
     </div>
     <div class="modal-actions">
@@ -880,10 +883,62 @@ window.openRentalForm = () => {
 
 function initSigCanvas() {
   const canvas = document.getElementById('sigCanvas')
+  if (canvas) setupCanvasDrawing(canvas)
+}
+
+window.clearSignature = () => {
+  const canvas = document.getElementById('sigCanvas')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  _hasDrawnSig = false
+}
+
+/* ── FIRMA DIGITAL PANTALLA COMPLETA ── */
+window.openFullscreenSig = () => {
+  const overlay = document.getElementById('sigFullscreenOverlay')
+  if (!overlay) return
+  overlay.classList.add('active')
+  document.body.classList.add('no-scroll')
+  
+  const canvas = document.getElementById('fsSigCanvas')
+  const wrap = canvas.parentElement
+  canvas.width = wrap.clientWidth
+  canvas.height = wrap.clientHeight
+  
+  setupCanvasDrawing(canvas)
+}
+
+window.closeFullscreenSig = () => {
+  const overlay = document.getElementById('sigFullscreenOverlay')
+  if (overlay) overlay.classList.remove('active')
+  document.body.classList.remove('no-scroll')
+}
+
+window.clearFullscreenSig = () => {
+  const canvas = document.getElementById('fsSigCanvas')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+}
+
+window.acceptFullscreenSig = () => {
+  const fsCanvas = document.getElementById('fsSigCanvas')
+  const mainCanvas = document.getElementById('sigCanvas')
+  if (fsCanvas && mainCanvas) {
+    const mainCtx = mainCanvas.getContext('2d')
+    mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height)
+    mainCtx.drawImage(fsCanvas, 0, 0, mainCanvas.width, mainCanvas.height)
+    _hasDrawnSig = true
+  }
+  window.closeFullscreenSig()
+}
+
+function setupCanvasDrawing(canvas) {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   ctx.strokeStyle = '#102a4c'
-  ctx.lineWidth = 2.5
+  ctx.lineWidth = 3
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
@@ -933,13 +988,6 @@ function initSigCanvas() {
   canvas.addEventListener('touchend', stopDraw)
 }
 
-window.clearSignature = () => {
-  const canvas = document.getElementById('sigCanvas')
-  if (!canvas) return
-  const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  _hasDrawnSig = false
-}
 
 window.previewRental = () => {
   const mId = document.getElementById('r_mach')?.value; if (!mId) return
@@ -1102,9 +1150,19 @@ window.viewRecibo = (rentalId, amount, date, method, notes) => {
         <tr><td class="muted"><strong>Saldo Restante Pendiente</strong></td><td style="text-align:right;"><strong style="color:${balance > 0 ? 'var(--red)' : 'var(--teal-deep)'}">${fmtMoney(balance)}</strong></td></tr>
       </table>
       ${notes ? `<p class="small muted">Notas / Referencia: ${notes}</p>` : ''}
-      <div class="sig">
-        <div><strong>${c ? c.name : '—'}</strong><br><span class="small muted">Firma del cliente</span></div>
-        <div><strong>${arrendadorNombre}</strong><br><span class="small muted">Firma de conformidad</span></div>
+      <div class="sig-section">
+        <div class="sig-box">
+          <div class="sig-space"></div>
+          <div class="sig-line"></div>
+          <strong>${c ? c.name : '—'}</strong>
+          <div class="small muted">Firma del cliente</div>
+        </div>
+        <div class="sig-box">
+          <div class="sig-space"></div>
+          <div class="sig-line"></div>
+          <strong>${arrendadorNombre}</strong>
+          <div class="small muted">Firma de conformidad</div>
+        </div>
       </div>
     </div>
     <div class="modal-actions no-print">
@@ -1217,13 +1275,20 @@ window.viewPagare = id => {
       <p>El cumplimiento se realizará mediante el pago de una <strong>renta ${rlbl}</strong> de <strong>${fmtMoney(p.unitPrice)}</strong> por ${ul}, durante <strong>${p.qty} ${ul}${p.qty > 1 ? 's' : ''}</strong>, lo que asciende a un total de <strong>${fmtMoney(p.totalCharged)}</strong>.</p>
       <p>Periodo: del <strong>${fmtDate(p.issueDate)}</strong> al <strong>${fmtDate(p.expectedReturn)}</strong>.${p.deposit > 0 ? ' Depósito en garantía: <strong>' + fmtMoney(p.deposit) + '</strong>.' : ''}</p>
       <p>En caso de no devolverse la máquina en la fecha pactada, esta obligación se hará exigible por el valor total señalado, conforme a la legislación aplicable en materia de títulos de crédito.</p>
-      <div class="sig">
-        <div>
-          ${sigData ? `<img src="${sigData}" alt="Firma Cliente" style="max-height:55px;display:block;margin:0 auto 4px;">` : ''}
-          <strong>${c ? c.name : '—'}</strong><br><span class="small muted">Firma del cliente / arrendatario</span>
+      <div class="sig-section">
+        <div class="sig-box">
+          <div class="sig-space">
+            ${sigData ? `<img src="${sigData}" alt="Firma Cliente">` : ''}
+          </div>
+          <div class="sig-line"></div>
+          <strong>${c ? c.name : '—'}</strong>
+          <div class="small muted">Firma del cliente / arrendatario</div>
         </div>
-        <div>
-          <strong>${arrendadorNombre}</strong><br><span class="small muted">Firma del arrendador</span>
+        <div class="sig-box">
+          <div class="sig-space"></div>
+          <div class="sig-line"></div>
+          <strong>${arrendadorNombre}</strong>
+          <div class="small muted">Firma del arrendador</div>
         </div>
       </div>
     </div>

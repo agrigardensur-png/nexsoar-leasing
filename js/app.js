@@ -532,10 +532,11 @@ window.saveMachine = async id => {
     setLocalMachBranch(mId, branch) // Guardar sucursal en localStorage
     
     if (photoFile) {
-      const path = `machines/${mId}_photo.jpg`
+      const path = `customers/machine_${mId}.jpg`
       const { error: uploadErr } = await sb.storage.from('customer-docs').upload(path, photoFile, { upsert: true, contentType: photoFile.type })
       if (uploadErr) {
         console.error("Error subiendo foto de máquina:", uploadErr)
+        toast('Advertencia: No se pudo subir la foto a Supabase (' + uploadErr.message + ')')
       } else {
         localStorage.removeItem('nexsoar_mach_photo_url_' + mId)
       }
@@ -1724,7 +1725,7 @@ window.getMachinePhotoURL = async (machineId) => {
   if (localCached) return localCached
   
   try {
-    const path = `machines/${machineId}_photo.jpg`
+    const path = `customers/machine_${machineId}.jpg`
     const { data, error } = await sb.storage.from('customer-docs').createSignedUrl(path, 86400 * 7)
     if (!error && data?.signedUrl) {
       localStorage.setItem('nexsoar_mach_photo_url_' + machineId, data.signedUrl)

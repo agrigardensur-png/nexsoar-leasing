@@ -359,15 +359,32 @@ window.saveMachine = async id => {
   } catch (e) { toast('Error: ' + (e.message || e)) } finally { hideLoading() }
 }
 window.deleteMachine = async id => {
-  if (S.rentals.some(r => r.machineId === id)) { toast('Tiene historial de rentas. Cambia su estatus.'); return }
-  if (!confirm('¿Eliminar esta máquina?')) return
-  showLoading('Eliminando…')
+  const m = S.machines.find(x => x.id === id)
+  if (!m) return
+  const machRentals = S.rentals.filter(r => r.machineId === id)
+  let confirmMsg = `¿Eliminar la máquina ${m.name}?`
+  if (machRentals.length > 0) {
+    confirmMsg = `La máquina ${m.name} tiene ${machRentals.length} renta(s) asociada(s). ¿Eliminar la máquina y todo su historial de rentas/pagarés?`
+  }
+  if (!confirm(confirmMsg)) return
+
+  showLoading('Eliminando máquina…')
   try {
+    if (machRentals.length > 0) {
+      const rentalIds = machRentals.map(r => r.id)
+      await sb.from('pagares').delete().in('rental_id', rentalIds)
+      await sb.from('rentals').delete().eq('machine_id', id)
+      S.pagares = S.pagares.filter(p => !rentalIds.includes(p.rentalId))
+      S.rentals = S.rentals.filter(r => r.machineId !== id)
+    }
+    await sb.from('maintenances').delete().eq('machine_id', id)
+    S.maintenances = S.maintenances.filter(x => x.machineId !== id)
+
     const { error } = await sb.from('machines').delete().eq('id', id)
     if (error) throw error
     S.machines = S.machines.filter(x => x.id !== id)
-    S.maintenances = S.maintenances.filter(x => x.machineId !== id)
-    renderInventario(); toast('Máquina eliminada')
+    renderInventario()
+    toast('Máquina eliminada')
   } catch (e) { toast('Error: ' + (e.message || e)) } finally { hideLoading() }
 }
 
@@ -438,7 +455,7 @@ window.deleteMaintenance = async id => {
 }
 
 /* ═══════════════════════════════════
-   CLIENTES Y DOCUMENTOS (CORREGIDO)
+   CLIENTES Y DOCUMENTOS
 ═══════════════════════════════════ */
 function renderClientes() {
   const el = document.getElementById('view-clientes')
@@ -531,7 +548,7 @@ function setupDZ(zId, iId, lId) {
   })
 }
 
-/* ── GUARDAR CLIENTE Y SUBIR DOCUMENTOS ROBUSTO ── */
+/* ── GUARDAR CLIENTE Y SUBIR DOCUMENTOS ── */
 window.saveCustomer = async id => {
   const name = document.getElementById('c_name').value.trim()
   if (!name) { toast('Falta el nombre'); return }
@@ -621,13 +638,29 @@ window.saveCustomer = async id => {
   }
 }
 window.deleteCustomer = async id => {
-  if (S.rentals.some(r => r.customerId === id)) { toast('El cliente tiene historial de rentas.'); return }
-  if (!confirm('¿Eliminar este cliente?')) return
-  showLoading('Eliminando…')
+  const c = S.customers.find(x => x.id === id)
+  if (!c) return
+  const custRentals = S.rentals.filter(r => r.customerId === id)
+  let confirmMsg = `¿Eliminar al cliente ${c.name}?`
+  if (custRentals.length > 0) {
+    confirmMsg = `El cliente ${c.name} tiene ${custRentals.length} renta(s) registrada(s). ¿Eliminar el cliente y todas sus rentas/pagarés asociados?`
+  }
+  if (!confirm(confirmMsg)) return
+
+  showLoading('Eliminando cliente…')
   try {
+    if (custRentals.length > 0) {
+      const rentalIds = custRentals.map(r => r.id)
+      await sb.from('pagares').delete().in('rental_id', rentalIds)
+      await sb.from('rentals').delete().eq('customer_id', id)
+      S.pagares = S.pagares.filter(p => !rentalIds.includes(p.rentalId))
+      S.rentals = S.rentals.filter(r => r.customerId !== id)
+    }
     const { error } = await sb.from('customers').delete().eq('id', id)
     if (error) throw error
-    S.customers = S.customers.filter(x => x.id !== id); renderClientes(); toast('Cliente eliminado')
+    S.customers = S.customers.filter(x => x.id !== id)
+    renderClientes()
+    toast('Cliente eliminado')
   } catch (e) { toast('Error: ' + (e.message || e)) } finally { hideLoading() }
 }
 
@@ -658,6 +691,7 @@ function renderRentas() {
               <td><div class="pill-row">
                 ${r.pagareId ? `<button class="btn small secondary" onclick="viewPagare('${r.pagareId}')">Ver pagaré</button>` : ''}
                 ${r.status === 'activa' ? `<button class="btn small" onclick="markReturned('${r.id}')">Marcar devuelta</button>` : ''}
+                <button class="btn small danger" onclick="deleteRental('${r.id}')">Eliminar</button>
               </div></td>
             </tr>`
           }).join('')}
@@ -772,6 +806,41 @@ window.confirmReturn = async id => {
     S.machines.find(m => m.id === r.machineId).status = newStatus
     closeModal(); toast('Devolución registrada'); renderRentas()
   } catch (e) { toast('Error: ' + (e.message || e)) } finally { hideLoading() }
+}
+window.deleteRental = async id => {
+  const r = S.rentals.find(x => x.id === id)
+  if (!r) return
+  if (!confirm(`¿Eliminar la renta de ${machineName(r.machineId)} (${customerName(r.customerId)}) y su pagaré asociado?`)) return
+  showLoading('Eliminando renta…')
+  try {
+    if (r.pagareId) {
+      await sb.from('pagares').delete().eq('id', r.pagareId)
+      S.pagares = S.pagares.filter(p => p.id !== r.pagareId)
+    } else {
+      await sb.from('pagares').delete().eq('rental_id', id)
+      S.pagares = S.pagares.filter(p => p.rentalId !== id)
+    }
+
+    const { error } = await sb.from('rentals').delete().eq('id', id)
+    if (error) throw error
+
+    const machine = S.machines.find(m => m.id === r.machineId)
+    if (machine && r.status === 'activa') {
+      const newCount = Math.max(0, (machine.rentalCount || 1) - 1)
+      await sb.from('machines').update({ status: 'disponible', rental_count: newCount }).eq('id', machine.id)
+      machine.status = 'disponible'
+      machine.rentalCount = newCount
+    }
+
+    S.rentals = S.rentals.filter(x => x.id !== id)
+    toast('Registro de renta eliminado')
+    renderRentas()
+  } catch (e) {
+    toast('Error al eliminar: ' + (e.message || e))
+    console.error(e)
+  } finally {
+    hideLoading()
+  }
 }
 
 /* ── PAGARÉ CON NOMBRE DEL ARRENDADOR Y VISTA COMPLETA DE IMPRESIÓN ── */

@@ -505,10 +505,32 @@ a.link:hover { color: var(--accent-deep); }
     overflow: visible !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    font-size: .83rem !important; /* Letra compacta para garantizar 1 sola hoja */
+    line-height: 1.45 !important;
   }
-
+  .pagare-doc h3, .recibo-doc h3 {
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+    font-size: 1.12rem !important;
+  }
+  .pagare-doc p, .recibo-doc p {
+    margin: 5px 0 !important;
+  }
+  .pagare-doc table, .recibo-doc table {
+    margin: 6px 0 !important;
+  }
+  .sig-section {
+    margin-top: 22px !important;
+  }
+  .sig-space {
+    height: 45px !important;
+  }
+  .sig-space img {
+    max-height: 45px !important;
+  }
   .pagare-doc::before, .recibo-doc::before { display: none !important; }
 }
+
 
 /* ── RESPONSIVE MOBILE & TABLET LAYOUT (max-width: 800px) ── */
 .menu-toggle {

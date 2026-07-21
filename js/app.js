@@ -928,11 +928,49 @@ window.acceptFullscreenSig = () => {
   if (fsCanvas && mainCanvas) {
     const mainCtx = mainCanvas.getContext('2d')
     mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height)
-    mainCtx.drawImage(fsCanvas, 0, 0, mainCanvas.width, mainCanvas.height)
-    _hasDrawnSig = true
+    
+    const box = getSigBoundingBox(fsCanvas)
+    if (box) {
+      const padding = 15
+      const bx = Math.max(0, box.x - padding)
+      const by = Math.max(0, box.y - padding)
+      const bw = Math.min(fsCanvas.width - bx, box.w + padding * 2)
+      const bh = Math.min(fsCanvas.height - by, box.h + padding * 2)
+      
+      const scale = Math.min(mainCanvas.width / bw, mainCanvas.height / bh)
+      const w = bw * scale
+      const h = bh * scale
+      const x = (mainCanvas.width - w) / 2
+      const y = (mainCanvas.height - h) / 2
+      
+      mainCtx.drawImage(fsCanvas, bx, by, bw, bh, x, y, w, h)
+      _hasDrawnSig = true
+    }
   }
   window.closeFullscreenSig()
 }
+
+function getSigBoundingBox(canvas) {
+  const ctx = canvas.getContext('2d')
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = imgData.data
+  let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0
+  let found = false
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const alpha = data[(y * canvas.width + x) * 4 + 3]
+      if (alpha > 0) {
+        if (x < minX) minX = x
+        if (y < minY) minY = y
+        if (x > maxX) maxX = x
+        if (y > maxY) maxY = y
+        found = true
+      }
+    }
+  }
+  return found ? { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 } : null
+}
+
 
 function setupCanvasDrawing(canvas) {
   if (!canvas) return

@@ -3,11 +3,18 @@ import {
   setME, setCurrentProfile, setModalClose,
   todayISO, fmtMoney, fmtDate, daysBetween, addDays, addMonths,
   mapGroup, mapMachine, mapCustomer, mapMaint, mapRental, mapPagare,
-  setLocalPaid, setLocalSig, getLocalPaid, getLocalSig
+  setLocalPaid, setLocalSig, getLocalPaid, getLocalSig,
+  getLocalMachBranch, setLocalMachBranch
 } from './supabase-client.js'
 
 /* ── NOMBRE DEL ARRENDADOR CONSTANTE ── */
 const DEFAULT_ARRENDADOR_NAME = 'Daniel Alejandro Ramirez Gonzalez'
+let currentInventoryBranch = 'all'
+window.setInventoryBranchFilter = branch => {
+  currentInventoryBranch = branch
+  renderInventario()
+}
+
 
 /* ── LOADING ── */
 const showLoading = (msg = 'Procesando…') => {
@@ -371,6 +378,12 @@ window.deleteGroup = async id => {
 ═══════════════════════════════════ */
 function renderInventario() {
   const el = document.getElementById('view-inventario')
+  
+  const filtered = S.machines.filter(m => {
+    if (currentInventoryBranch === 'all') return true
+    return m.branch === currentInventoryBranch
+  })
+
   el.innerHTML = `
     <div class="toolbar">
       <h2 style="margin:0;">Inventario de maquinaria</h2>
@@ -379,15 +392,39 @@ function renderInventario() {
         <button class="btn" onclick="openMachineForm()">+ Dar de alta máquina</button>
       </div>
     </div>
+    
+    <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <span class="muted" style="font-size: 0.9rem; font-weight: 500;">📍 Filtrar por sucursal:</span>
+      <div class="pill-group">
+        <button class="pill-btn ${currentInventoryBranch === 'all' ? 'active' : ''}" onclick="setInventoryBranchFilter('all')">Todas</button>
+        <button class="pill-btn ${currentInventoryBranch === 'norte' ? 'active' : ''}" onclick="setInventoryBranchFilter('norte')">Sucursal Norte</button>
+        <button class="pill-btn ${currentInventoryBranch === 'sur' ? 'active' : ''}" onclick="setInventoryBranchFilter('sur')">Sucursal Sur</button>
+      </div>
+    </div>
+
     <div class="card">
-      ${S.machines.length === 0 ? '<div class="empty">No hay máquinas registradas.</div>' : `
+      ${filtered.length === 0 ? '<div class="empty">No hay máquinas registradas en esta sucursal.</div>' : `
       <div class="table-scroll">
         <table><thead><tr>
           <th>Máquina</th><th>Grupo</th><th>Costo / Precio</th>
           <th>Renta día / semana / mes</th><th>Veces rentada</th><th>Estatus</th><th>Acciones</th>
         </tr></thead><tbody>
-          ${S.machines.map(m => `<tr>
-            <td><strong>${m.name}</strong><div class="small muted">${m.brand} ${m.model} · Serie: ${m.serial || '—'}</div></td>
+          ${filtered.map(m => `<tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div class="machine-thumb-wrap">
+                  <img id="thumb_m_${m.id}" class="machine-thumbnail" src="" style="display:none;" onload="this.style.display='block'">
+                  <div id="thumb_m_${m.id}_fallback" class="machine-thumb-fallback">🚜</div>
+                </div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <strong>${m.name}</strong>
+                    <span class="badge ${m.branch === 'norte' ? 'ok' : 'info'}" style="font-size:0.7rem; padding:2px 6px;">${m.branch === 'norte' ? 'Norte' : 'Sur'}</span>
+                  </div>
+                  <div class="small muted">${m.brand} ${m.model} · Serie: ${m.serial || '—'}</div>
+                </div>
+              </div>
+            </td>
             <td>${groupName(m.groupId)}</td>
             <td>Costo: <strong>${fmtMoney(m.purchaseCost)}</strong><br>Precio: <strong>${fmtMoney(m.salePrice)}</strong><div class="small muted">${fmtDate(m.purchaseDate)}</div></td>
             <td>${fmtMoney(m.dailyPrice)} / ${fmtMoney(m.weeklyPrice)} / ${fmtMoney(m.monthlyPrice)}</td>
@@ -406,7 +443,13 @@ function renderInventario() {
         </tbody></table>
       </div>`}
     </div>`
+
+  // Cargar las fotos asíncronamente
+  filtered.forEach(m => {
+    window.loadMachineThumbnail(m.id, 'thumb_m_' + m.id)
+  })
 }
+
 window.openMachineForm = id => {
   const m = id ? S.machines.find(x => x.id === id) : null
   const opts = S.groups.map(g => `<option value="${g.id}" ${m && m.groupId === g.id ? 'selected' : ''}>${g.name}</option>`).join('')
@@ -425,19 +468,40 @@ window.openMachineForm = id => {
         <option value="rentada" ${m && m.status === 'rentada' ? 'selected' : ''}>Rentada</option>
         <option value="mantenimiento" ${m && m.status === 'mantenimiento' ? 'selected' : ''}>En mantenimiento</option>
       </select></label>
+      <label>Sucursal<select id="f_branch">
+        <option value="norte" ${m && m.branch === 'norte' ? 'selected' : ''}>Sucursal Norte</option>
+        <option value="sur" ${m && m.branch === 'sur' ? 'selected' : ''}>Sucursal Sur</option>
+      </select></label>
       <label>Precio por día<input id="f_daily" type="number" min="0" step="0.01" value="${m ? m.dailyPrice : ''}"></label>
       <label>Precio por semana<input id="f_weekly" type="number" min="0" step="0.01" value="${m ? m.weeklyPrice : ''}"></label>
       <label>Precio por mes<input id="f_monthly" type="number" min="0" step="0.01" value="${m ? m.monthlyPrice : ''}"></label>
+      
+      <div class="field-block" style="grid-column: 1/-1;"><span class="field-label">Fotografía de la máquina</span>
+        <div class="dropzone" id="z_mphoto">
+          <input id="f_mphoto" type="file" accept="image/*">
+          <div class="dz-icon">📸</div><div class="dz-text">Arrastra o <span class="dz-browse">elige una foto</span></div>
+          <div class="dz-filename" id="l_mphoto">Sin archivo seleccionado</div>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn" onclick="saveMachine(${m ? `'${m.id}'` : 'null'})">Guardar</button>
+      <button class="btn" id="m_save" onclick="saveMachine(${m ? `'${m.id}'` : 'null'})">Guardar</button>
     </div>`)
   if (m) document.getElementById('f_group').value = m.groupId || ''
+  setupDZ('z_mphoto', 'f_mphoto', 'l_mphoto')
 }
+
 window.saveMachine = async id => {
   const name = document.getElementById('f_name').value.trim()
   if (!name) { toast('Falta el nombre'); return }
+  const photoFile = document.getElementById('f_mphoto').files?.[0]
+  const branch = document.getElementById('f_branch').value
+  const saveBtn = document.getElementById('m_save')
+  
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando…' }
+  showLoading('Guardando máquina…')
+  
   const row = {
     name, group_id: document.getElementById('f_group').value || null,
     brand: document.getElementById('f_brand').value.trim(),
@@ -451,21 +515,49 @@ window.saveMachine = async id => {
     weekly_price: Number(document.getElementById('f_weekly').value) || 0,
     monthly_price: Number(document.getElementById('f_monthly').value) || 0,
   }
-  showLoading('Guardando…')
+  
   try {
+    let machineRecord = null
     if (id) {
-      const { error } = await sb.from('machines').update(row).eq('id', id)
+      const { data, error } = await sb.from('machines').update(row).eq('id', id).select().single()
       if (error) throw error
-      const existing = S.machines.find(x => x.id === id)
-      Object.assign(existing, mapMachine({ ...row, id, rental_count: existing.rentalCount }))
-      toast('Máquina actualizada')
+      machineRecord = data
     } else {
       const { data, error } = await sb.from('machines').insert({ ...row, user_id: ME.id, rental_count: 0 }).select().single()
       if (error) throw error
-      S.machines.push(mapMachine(data)); toast('Máquina dada de alta')
+      machineRecord = data
     }
-    closeModal(); renderInventario()
-  } catch (e) { toast('Error: ' + (e.message || e)) } finally { hideLoading() }
+    
+    const mId = machineRecord.id
+    setLocalMachBranch(mId, branch) // Guardar sucursal en localStorage
+    
+    if (photoFile) {
+      const path = `machines/${mId}_photo.jpg`
+      const { error: uploadErr } = await sb.storage.from('customer-docs').upload(path, photoFile, { upsert: true, contentType: photoFile.type })
+      if (uploadErr) {
+        console.error("Error subiendo foto de máquina:", uploadErr)
+      } else {
+        localStorage.removeItem('nexsoar_mach_photo_url_' + mId)
+      }
+    }
+    
+    const mapped = mapMachine(machineRecord)
+    if (id) {
+      const idx = S.machines.findIndex(x => x.id === id)
+      if (idx !== -1) S.machines[idx] = mapped
+      toast('Máquina actualizada')
+    } else {
+      S.machines.push(mapped)
+      toast('Máquina dada de alta')
+    }
+    closeModal()
+    renderInventario()
+  } catch (e) {
+    toast('Error: ' + (e.message || e))
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar' }
+    hideLoading()
+  }
 }
 window.deleteMachine = async id => {
   const m = S.machines.find(x => x.id === id)
@@ -1433,25 +1525,36 @@ function renderReportes() {
     <div class="grid cols-2">
       ${S.machines.map(m => {
         const f = machineFinancials(m.id)
-        return `<div class="card">
-          <div class="flex-between"><h3 style="margin:0;">${m.name}</h3>${statusBadge(m.status)}</div>
-          <p class="small muted">${m.brand} ${m.model} · Rentada ${m.rentalCount || 0} veces</p>
-          <table>
-            <tr><td class="muted">Costo de adquisición</td><td style="text-align:right;">${fmtMoney(f.purchaseCost)}</td></tr>
-            <tr><td class="muted">Costo de mantenimientos</td><td style="text-align:right;">${fmtMoney(f.maintCost)}</td></tr>
-            <tr><td class="muted"><strong>Inversión total</strong></td><td style="text-align:right;"><strong>${fmtMoney(f.totalCost)}</strong></td></tr>
-            <tr><td class="muted">Ingresos acumulados</td><td style="text-align:right;">${fmtMoney(f.income)}</td></tr>
-            <tr><td class="muted"><strong>Ganancia / pérdida neta</strong></td>
-              <td style="text-align:right;"><strong style="color:${f.netProfit >= 0 ? 'var(--teal-deep)' : 'var(--red)'}">${fmtMoney(f.netProfit)}</strong></td></tr>
-          </table>
-          <div style="margin:10px 0 4px;">
-            <div class="flex-between small muted"><span>Recuperación de inversión</span><span>${f.recovered.toFixed(0)}%</span></div>
-            <div class="progress-bar"><div style="width:${f.recovered}%;background:${f.isProfitable ? 'linear-gradient(90deg,var(--teal),var(--teal-deep))' : 'linear-gradient(90deg,var(--amber),var(--accent-deep))'}"></div></div>
+        return `<div class="card" style="padding:0;overflow:hidden;">
+          <div style="height:140px;width:100%;background:var(--navy-900);position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+            <img id="card_img_m_${m.id}" src="" class="machine-card-hero" style="display:none;" onload="this.style.display='block'">
+            <div id="card_img_m_${m.id}_fallback" class="machine-thumb-fallback" style="font-size:2.8rem;color:rgba(255,255,255,0.4)">🚜</div>
           </div>
-          ${f.isProfitable ? '<span class="badge ok">✔ Genera ganancia neta</span>' : `<span class="badge warn">Recuperando — faltan ${fmtMoney(Math.max(0, f.totalCost - f.income))}</span>`}
+          <div style="padding:20px;">
+            <div class="flex-between"><h3 style="margin:0;">${m.name}</h3>${statusBadge(m.status)}</div>
+            <p class="small muted">${m.brand} ${m.model} · Rentada ${m.rentalCount || 0} veces</p>
+            <table>
+              <tr><td class="muted">Costo de adquisición</td><td style="text-align:right;">${fmtMoney(f.purchaseCost)}</td></tr>
+              <tr><td class="muted">Costo de mantenimientos</td><td style="text-align:right;">${fmtMoney(f.maintCost)}</td></tr>
+              <tr><td class="muted"><strong>Inversión total</strong></td><td style="text-align:right;"><strong>${fmtMoney(f.totalCost)}</strong></td></tr>
+              <tr><td class="muted">Ingresos acumulados</td><td style="text-align:right;">${fmtMoney(f.income)}</td></tr>
+              <tr><td class="muted"><strong>Ganancia / pérdida neta</strong></td>
+                <td style="text-align:right;"><strong style="color:${f.netProfit >= 0 ? 'var(--teal-deep)' : 'var(--red)'}">${fmtMoney(f.netProfit)}</strong></td></tr>
+            </table>
+            <div style="margin:10px 0 4px;">
+              <div class="flex-between small muted"><span>Recuperación de inversión</span><span>${f.recovered.toFixed(0)}%</span></div>
+              <div class="progress-bar"><div style="width:${f.recovered}%;background:${f.isProfitable ? 'linear-gradient(90deg,var(--teal),var(--teal-deep))' : 'linear-gradient(90deg,var(--amber),var(--accent-deep))'}"></div></div>
+            </div>
+            ${f.isProfitable ? '<span class="badge ok">✔ Genera ganancia neta</span>' : `<span class="badge warn">Recuperando — faltan ${fmtMoney(Math.max(0, f.totalCost - f.income))}</span>`}
+          </div>
         </div>`
       }).join('')}
     </div>`
+
+  // Cargar las fotos de portada asíncronamente
+  S.machines.forEach(m => {
+    window.loadMachineThumbnail(m.id, 'card_img_m_' + m.id)
+  })
 }
 
 /* ── GESTIÓN DE USUARIOS ── */
@@ -1614,6 +1717,41 @@ window.showView = id => {
   if (renderFns[id]) renderFns[id]()
 }
 window.closeModal = closeModal
+
+/* ── MANEJO DE FOTOGRAFÍAS DE MAQUINARIA ── */
+window.getMachinePhotoURL = async (machineId) => {
+  const localCached = localStorage.getItem('nexsoar_mach_photo_url_' + machineId)
+  if (localCached) return localCached
+  
+  try {
+    const path = `machines/${machineId}_photo.jpg`
+    const { data, error } = await sb.storage.from('customer-docs').createSignedUrl(path, 86400 * 7)
+    if (!error && data?.signedUrl) {
+      localStorage.setItem('nexsoar_mach_photo_url_' + machineId, data.signedUrl)
+      return data.signedUrl
+    }
+  } catch (e) {
+    console.log('No photo for machine:', machineId)
+  }
+  return null
+}
+
+window.loadMachineThumbnail = async (machineId, imgElId) => {
+  const url = await window.getMachinePhotoURL(machineId)
+  const img = document.getElementById(imgElId)
+  if (img) {
+    if (url) {
+      img.src = url
+      img.style.display = 'block'
+      const fallback = document.getElementById(imgElId + '_fallback')
+      if (fallback) fallback.style.display = 'none'
+    } else {
+      img.style.display = 'none'
+      const fallback = document.getElementById(imgElId + '_fallback')
+      if (fallback) fallback.style.display = 'flex'
+    }
+  }
+}
 
 /* Inicialización */
 async function supabase_init() {

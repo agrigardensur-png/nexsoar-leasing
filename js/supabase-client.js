@@ -21,6 +21,9 @@ export const getLocalPaid = id => Number(localStorage.getItem('nexsoar_paid_' + 
 export const setLocalPaid = (id, amt) => localStorage.setItem('nexsoar_paid_' + id, amt)
 export const getLocalSig = id => localStorage.getItem('nexsoar_sig_' + id) || null
 export const setLocalSig = (id, sig) => { if (sig) localStorage.setItem('nexsoar_sig_' + id, sig) }
+export const getLocalMachBranch = id => localStorage.getItem('nexsoar_mach_branch_' + id) || 'norte'
+export const setLocalMachBranch = (id, branch) => localStorage.setItem('nexsoar_mach_branch_' + id, branch)
+
 
 /* ── HELPERS DE FORMATO ── */
 export const todayISO = () => new Date().toISOString().slice(0, 10)
@@ -42,7 +45,8 @@ export const mapMachine = r => ({
   purchaseCost: Number(r.purchase_cost) || 0, salePrice: Number(r.sale_price) || 0,
   purchaseDate: r.purchase_date || '',
   dailyPrice: Number(r.daily_price) || 0, weeklyPrice: Number(r.weekly_price) || 0, monthlyPrice: Number(r.monthly_price) || 0,
-  status: r.status || 'disponible', rentalCount: r.rental_count || 0
+  status: r.status || 'disponible', rentalCount: r.rental_count || 0,
+  branch: getLocalMachBranch(r.id)
 })
 export const mapCustomer = r => ({
   id: r.id, name: r.name, phone: r.phone || '', email: r.email || '',

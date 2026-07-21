@@ -1549,7 +1549,26 @@ function buildNav() {
     b.onclick = () => showView(t.id); nav.appendChild(b)
   })
 }
+window.toggleMobileMenu = () => {
+  const nav = document.getElementById('nav')
+  const backdrop = document.getElementById('navBackdrop')
+  if (nav && backdrop) {
+    const active = nav.classList.toggle('active')
+    backdrop.classList.toggle('active', active)
+    document.body.classList.toggle('no-scroll', active)
+  }
+}
+window.closeMobileMenu = () => {
+  const nav = document.getElementById('nav')
+  const backdrop = document.getElementById('navBackdrop')
+  if (nav && backdrop) {
+    nav.classList.remove('active')
+    backdrop.classList.remove('active')
+    document.body.classList.remove('no-scroll')
+  }
+}
 window.showView = id => {
+  window.closeMobileMenu()
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   const v = document.getElementById('view-' + id)
   if (v) v.classList.add('active')
@@ -1567,3 +1586,4 @@ async function supabase_init() {
   }
 }
 supabase_init()
+

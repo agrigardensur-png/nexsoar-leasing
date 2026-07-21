@@ -246,14 +246,17 @@
 <!-- ═══════════ APP ═══════════ -->
 <div id="appRoot" style="display:none;">
   <header>
-    <div class="brand">
-      <div class="logo"><img src="Logo.jpg" alt="NexSoar" onerror="this.parentElement.textContent='NS'"></div>
-      <div>
-        <h1>NexSoar System Leasing</h1>
-        <div class="sub">Inventario · Rentas · Pagarés · Mantenimientos · Reportes</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="menu-toggle no-print" onclick="toggleMobileMenu()">☰</button>
+      <div class="brand">
+        <div class="logo"><img src="Logo.jpg" alt="NexSoar" onerror="this.parentElement.textContent='NS'"></div>
+        <div>
+          <h1>NexSoar System Leasing</h1>
+          <div class="sub">Inventario · Rentas · Pagarés · Mantenimientos · Reportes</div>
+        </div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;position:relative;z-index:1;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:12px;position:relative;z-index:1;">
       <div class="today" id="todayLabel"></div>
       <div id="userInfo"></div>
       <button class="btn secondary" style="font-size:.76rem;padding:7px 14px;" onclick="doLogout()">Cerrar sesión</button>
@@ -261,6 +264,8 @@
   </header>
 
   <nav id="nav"></nav>
+  <div class="nav-backdrop" id="navBackdrop" onclick="closeMobileMenu()"></div>
+
 
   <main>
     <div class="view active" id="view-dashboard"></div>

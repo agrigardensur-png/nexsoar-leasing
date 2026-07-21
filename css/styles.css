@@ -510,40 +510,120 @@ a.link:hover { color: var(--accent-deep); }
   .pagare-doc::before, .recibo-doc::before { display: none !important; }
 }
 
-/* ── Mobile ≤600px ── */
-@media(max-width:600px){
-  .login-left { padding: 20px 18px; }
+/* ── RESPONSIVE MOBILE & TABLET LAYOUT (max-width: 800px) ── */
+.menu-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.6rem;
+  cursor: pointer;
+  padding: 8px;
+  line-height: 1;
+}
+
+@media(max-width: 800px) {
+  .menu-toggle { display: block; }
+  
+  html, body {
+    overflow-x: hidden !important;
+    width: 100% !important;
+  }
+
+  .login-left { padding: 24px 20px; }
   .login-left-content { flex-direction: row; align-items: center; gap: 14px; flex-wrap: nowrap; justify-content: flex-start; }
   .login-logo-wrap { width: 58px; height: 58px; border-radius: 14px; margin-bottom: 0; flex-shrink: 0; }
   .login-brand { font-size: 1.4rem; margin: 0; text-align: left; }
   .login-brand-sub { font-size: .85rem; }
   .login-tagline,.login-left-hero,.login-features,.login-left-footer { display: none !important; }
-  .login-right { padding: 22px 18px 30px; }
+  .login-right { padding: 24px 20px 30px; }
   .login-right-inner { max-width: 100%; }
-  header { padding: 10px 14px; gap: 8px; flex-wrap: nowrap; align-items: center; }
-  header .brand { gap: 10px; min-width: 0; }
-  header .logo { width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; }
-  header h1 { font-size: .97rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  header .sub { display: none !important; }
-  header .today { display: none !important; }
-  header #userInfo { display: none !important; }
-  header .btn { font-size: .72rem !important; padding: 6px 10px !important; white-space: nowrap; }
-  nav {
-    padding: 6px 10px; gap: 4px;
-    overflow-x: auto; flex-wrap: nowrap !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+
+  header {
+    padding: 12px 16px !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    justify-content: space-between;
   }
-  nav::-webkit-scrollbar { display: none; }
-  nav button { padding: 7px 11px; font-size: .78rem; flex-shrink: 0; border-radius: 8px; }
-  main { padding: 14px; }
-  .card { padding: 14px; border-radius: 11px; }
-  .stat .num { font-size: 1.55rem; }
-  .toolbar { gap: 8px; }
-  .toolbar h2 { font-size: 1.05rem; }
-  .toolbar .btn { font-size: .78rem; padding: 8px 13px; }
-  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 9px; margin: 0 -14px; }
-  .table-scroll table { min-width: 580px; }
+  header .brand { gap: 8px; min-width: 0; }
+  header .logo { width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0; }
+  header h1 { font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+  header .sub, header .today, header #userInfo { display: none !important; }
+  header .btn { font-size: .75rem !important; padding: 7px 12px !important; white-space: nowrap; }
+
+  /* Navigation Drawer Sidebar */
+  nav {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    background: var(--navy-900);
+    box-shadow: 10px 0 30px rgba(0,0,0,0.3);
+    flex-direction: column !important;
+    padding: 30px 18px !important;
+    gap: 12px !important;
+    z-index: 999;
+    transition: left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    display: flex !important;
+    overflow-y: auto;
+    border-bottom: none !important;
+  }
+  nav.active {
+    left: 0;
+  }
+  nav button {
+    width: 100%;
+    text-align: left;
+    color: rgba(255,255,255,0.7) !important;
+    padding: 12px 16px !important;
+    border-radius: 10px;
+    font-size: 0.95rem !important;
+    background: transparent !important;
+    border: 1px solid transparent;
+  }
+  nav button:hover {
+    background: rgba(255,255,255,0.06) !important;
+    color: #fff !important;
+  }
+  nav button.active {
+    color: var(--navy-950) !important;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep)) !important;
+    box-shadow: 0 6px 16px rgba(212,175,55,0.25) !important;
+  }
+  nav button.active::after {
+    display: none !important;
+  }
+
+  .nav-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(6,14,31,0.5);
+    backdrop-filter: blur(2px);
+    z-index: 998;
+  }
+  .nav-backdrop.active {
+    display: block;
+  }
+
+  main { padding: 16px 12px; }
+  .card { padding: 16px; border-radius: 12px; }
+  .stat .num { font-size: 1.6rem; }
+  .toolbar { gap: 10px; flex-direction: column; align-items: flex-start; }
+  .toolbar h2 { font-size: 1.15rem; margin-bottom: 4px; }
+  .toolbar .btn { width: 100%; font-size: .85rem; padding: 11px 16px; text-align: center; }
+  
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+    margin: 0;
+    width: 100%;
+    border: 1px solid var(--border);
+  }
+  .table-scroll table { min-width: 640px; }
 }
 
 /* ── PANTALLA COMPLETA DE FIRMA PARA MÓVIL Y IPAD ── */
